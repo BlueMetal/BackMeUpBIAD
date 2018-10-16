@@ -1,9 +1,11 @@
 ﻿// Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Bot.Builder;
+using Microsoft.Bot.Builder.AI.QnA;
 using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Logging;
 
@@ -20,27 +22,28 @@ namespace HalBot9000
     /// <see cref="IStatePropertyAccessor{T}"/> object are created with a singleton lifetime.
     /// </summary>
     /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.1"/>
-    public class EchoWithCounterBot : IBot
+    public class HalBot : IBot
     {
-        private readonly EchoBotAccessors _accessors;
+        private readonly QnAMaker _qnaMaker;
         private readonly ILogger _logger;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="EchoWithCounterBot"/> class.
+        /// Initializes a new instance of the <see cref="HalBot"/> class.
         /// </summary>
         /// <param name="accessors">A class containing <see cref="IStatePropertyAccessor{T}"/> used to manage state.</param>
+        /// <param name="qnaMaker">The service to connect to the QnA Azure service</param>
         /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> that is hooked to the Azure App Service provider.</param>
         /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-2.1#windows-eventlog-provider"/>
-        public EchoWithCounterBot(EchoBotAccessors accessors, ILoggerFactory loggerFactory)
+        public HalBot(QnAMaker qnaMaker, ILoggerFactory loggerFactory)
         {
             if (loggerFactory == null)
             {
                 throw new System.ArgumentNullException(nameof(loggerFactory));
             }
 
-            _logger = loggerFactory.CreateLogger<EchoWithCounterBot>();
+            _logger = loggerFactory.CreateLogger<HalBot>();
             _logger.LogTrace("EchoBot turn start.");
-            _accessors = accessors ?? throw new System.ArgumentNullException(nameof(accessors));
+            _qnaMaker = qnaMaker;
         }
 
         /// <summary>
@@ -58,26 +61,25 @@ namespace HalBot9000
         /// <seealso cref="IMiddleware"/>
         public async Task OnTurnAsync(ITurnContext turnContext, CancellationToken cancellationToken = default(CancellationToken))
         {
-            // Handle Message activity type, which is the main activity type for shown within a conversational interface
-            // Message activities may contain text, speech, interactive cards, and binary or unknown attachments.
-            // see https://aka.ms/about-bot-activity-message to learn more about the message and other activity types
             if (turnContext.Activity.Type == ActivityTypes.Message)
             {
-                // Get the conversation state from the turn context.
-                var state = await _accessors.CounterState.GetAsync(turnContext, () => new CounterState());
+                if (string.IsNullOrWhiteSpace(turnContext.Activity.Text))
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text("This doesn't work unless you say something first."), cancellationToken);
+                    return;
+                }
 
-                // Bump the turn count for this conversation.
-                state.TurnCount++;
+                var results = await _qnaMaker.GetAnswersAsync(turnContext).ConfigureAwait(false);
 
-                // Set the property using the accessor.
-                await _accessors.CounterState.SetAsync(turnContext, state);
-
-                // Save the new turn count into the conversation state.
-                await _accessors.ConversationState.SaveChangesAsync(turnContext);
-
-                // Echo back to the user whatever they typed.
-                var responseMessage = $"Turn {state.TurnCount}: You sent '{turnContext.Activity.Text}'\n";
-                await turnContext.SendActivityAsync(responseMessage);
+                if (results.Any())
+                {
+                    var topResult = results.First();
+                    await turnContext.SendActivityAsync(MessageFactory.Text(topResult.Answer), cancellationToken);
+                }
+                else
+                {
+                    await turnContext.SendActivityAsync(MessageFactory.Text("I'm sorry Dave, I don't understand you."), cancellationToken);
+                }
             }
             else
             {

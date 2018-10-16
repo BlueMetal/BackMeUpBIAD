@@ -8,6 +8,14 @@
       "appId": "",
       "appPassword": "",
       "id": "1"
+    },
+    {
+      "type": "qna",
+      "name": "hal-bot-9000",
+      "kbId": "7d2712cb-930b-444f-97f4-1407704310c3",
+      "endpointKey": "40c366b0-283b-4203-a63d-a8f1e254f5f2",
+      "hostname": "https://diqna.azurewebsites.net/qnamaker",
+      "id": "88"
     }
   ],
   "padlock": "",
