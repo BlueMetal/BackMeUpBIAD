@@ -347,7 +347,7 @@ Some of the questions will be very personal. While we do use the information you
             var race = (FoundChoice)stepContext.Result;
             state.Race = BackPainTranslations.Races[race.Value].code;
 
-            // reflect the user's age back. This is retrieved from state
+            // reflect the user's answers back. This is retrieved from state
             var serialized = JsonConvert.SerializeObject(state, Formatting.Indented);
             await stepContext.Context.SendActivityAsync(MessageFactory.Text(serialized), cancellationToken);
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
