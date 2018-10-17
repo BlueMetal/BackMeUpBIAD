@@ -4,7 +4,7 @@
     {
         public string Age { get; set; }
 
-        public string Sex { get; set; }
+        public string BiologicalSex { get; set; }
 
         public string CancerHistory { get; set; }
 
