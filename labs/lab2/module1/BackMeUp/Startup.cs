@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Linq;
+using BackMeUp.Dialogs;
+using BackMeUp.Dialogs.BackPain;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Bot.Builder;
+using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Integration;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Configuration;
@@ -62,6 +65,32 @@ namespace BackMeUp
             }
 
             services.AddBot<BackMeUp>(opt => ConfigureBot<BackMeUp>(opt, credentialProvider, _loggerFactory));
+            services.AddSingleton(CreateDialogAccessors);
+            services.AddSingleton<BackPainDialogFactory>();
+        }
+
+        public DialogAccessors CreateDialogAccessors(IServiceProvider serviceProvider)
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<BotFrameworkOptions>>().Value;
+            if (options == null)
+            {
+                throw new InvalidOperationException(
+                    "BBotFrameworkOptions must be configured prior to setting up the state accessors");
+            }
+
+            var conversationState = options.State.OfType<ConversationState>().FirstOrDefault();
+            if (conversationState == null)
+            {
+                throw new InvalidOperationException(
+                    "ConversationState must be defined and added before adding conversation-scoped state accessors.");
+            }
+
+            var accessors = new DialogAccessors(conversationState)
+            {
+                DialogState = conversationState.CreateProperty<DialogState>(DialogAccessors.DialogStateName),
+            };
+
+            return accessors;
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)
