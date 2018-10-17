@@ -78,12 +78,43 @@ Some of the questions will be very personal. While we do use the information you
                 cancellationToken);
         }
 
-        public async Task<DialogTurnResult> NextStepAsync(
+        private async Task<bool> ValidateAgeAsync(PromptValidatorContext<int> context, CancellationToken cancellationToken)
+        {
+            // Validates the age provided by the user. This will prevent invalid data.
+            var value = context.Recognized.Value;
+            if (value <= 0)
+            {
+                await context.Context.SendActivityAsync(
+                    MessageFactory.Text("You must be older than zero years old."),
+                    cancellationToken);
+                return false;
+            }
+
+            // if the user is older than 120, make the age -1. This will cause them to exit out on the next step.
+            if (value <= 120)
+            {
+                return true;
+            }
+
+            await context.Context.SendActivityAsync(
+                MessageFactory.Text($"Congratulations for making it to {value} years of age. Unfortunately, our data set doesn't have the data necessary to help you."),
+                cancellationToken);
+            context.Recognized.Value = -1;
+
+            return true;
+        }
+
+        private async Task<DialogTurnResult> NextStepAsync(
             WaterfallStepContext stepContext,
             CancellationToken cancellationToken)
         {
             // get the age from the last prompt
             var result = (int)stepContext.Result;
+
+            if (result < 0)
+            {
+                return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+            }
 
             // get the state (or create it if it is new)
             var state = await _accessors.BackPainDemographics.GetAsync(
@@ -99,7 +130,7 @@ Some of the questions will be very personal. While we do use the information you
             return await stepContext.NextAsync(cancellationToken: cancellationToken);
         }
 
-        public async Task<DialogTurnResult> FinalStepAsync(
+        private async Task<DialogTurnResult> FinalStepAsync(
             WaterfallStepContext stepContext,
             CancellationToken cancellationToken)
         {
@@ -116,7 +147,7 @@ Some of the questions will be very personal. While we do use the information you
         private void RegisterPrompts(DialogSet dialogSet)
         {
             dialogSet.Add(new ConfirmPrompt(Prompts.ConfirmStart));
-            dialogSet.Add(new NumberPrompt<int>(Prompts.Age));
+            dialogSet.Add(new NumberPrompt<int>(Prompts.Age, ValidateAgeAsync));
         }
 
         private static class Prompts
