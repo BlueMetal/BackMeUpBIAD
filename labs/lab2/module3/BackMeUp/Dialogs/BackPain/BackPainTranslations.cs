@@ -14,15 +14,15 @@ namespace BackMeUp.Dialogs.BackPain
         }
 
         public static readonly Dictionary<string, string> Treatments = new Dictionary<string, string>
-            {
-                {"22554", "Anterior Interbody Fusion"},
-                {"22524", "Percutaneous Vertebral Augmentation"},
-                {"97111", "Physical Therapy"},
-                {"97110", "OTC Rx"},
-                {"76910", "Epidural"},
-                {"76911", "Physiatry"},
-                {"63030", "Posterior Lamina Removal with Decomp"},
-            };
+        {
+            { "22554", "Anterior Interbody Fusion" },
+            { "22524", "Percutaneous Vertebral Augmentation" },
+            { "97111", "Physical Therapy" },
+            { "97110", "OTC Rx" },
+            { "76910", "Epidural" },
+            { "76911", "Physiatry" },
+            { "63030", "Posterior Lamina Removal with Decomp" },
+        };
 
         public static readonly List<Choice> ConfirmCompleteChoices = new List<Choice>
         {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using BackMeUp.AzureML;
 using BackMeUp.Dialogs;
 using BackMeUp.Dialogs.BackPain;
 using Microsoft.AspNetCore.Builder;
@@ -72,6 +73,11 @@ namespace BackMeUp
             services.AddBot<BackMeUp>(opt => ConfigureBot<BackMeUp>(opt, credentialProvider, _loggerFactory));
             services.AddSingleton(CreateDialogAccessors);
             services.AddSingleton<BackPainDialogFactory>();
+
+            var amlSection = Configuration.GetSection("AzureMachineLearning");
+            var amlUri = new Uri(amlSection.GetValue<string>("EndpointUri"));
+            var amlApiKey = amlSection.GetValue<string>("ApiKey");
+            services.AddSingleton(new HealthOutcomeService(amlUri, amlApiKey));
         }
 
         public DialogAccessors CreateDialogAccessors(IServiceProvider serviceProvider)
