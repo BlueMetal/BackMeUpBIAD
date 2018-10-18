@@ -1,19 +1,21 @@
-﻿using System.Linq;
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BackMeUp.Dialogs;
 using BackMeUp.Dialogs.BackPain;
+using BackMeUp.Messages;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 
 namespace BackMeUp
 {
     public class BackMeUp : IBot
     {
-        private readonly ILogger _logger;
-
         // Module 2
         private readonly DialogAccessors _accessors;
         private readonly DialogSet _dialogs;
@@ -23,7 +25,7 @@ namespace BackMeUp
         {
             if (loggerFactory == null)
             {
-                throw new System.ArgumentNullException(nameof(loggerFactory));
+                throw new ArgumentNullException(nameof(loggerFactory));
             }
 
             // Module 2
@@ -31,8 +33,8 @@ namespace BackMeUp
             _dialogs = new DialogSet(_accessors.DialogState);
             _dialogs.Add(backPainDialogFactory.Configure(_dialogs));
 
-            _logger = loggerFactory.CreateLogger<BackMeUp>();
-            _logger.LogTrace("EchoBot turn start.");
+            ILogger logger = loggerFactory.CreateLogger<BackMeUp>();
+            logger.LogTrace("EchoBot turn start.");
         }
 
         public async Task OnTurnAsync(ITurnContext turnContext, CancellationToken cancellationToken = default(CancellationToken))
@@ -40,16 +42,47 @@ namespace BackMeUp
             if (turnContext.Activity.Type == ActivityTypes.Message)
             {
                 var dialogContext = await _dialogs.CreateContextAsync(turnContext, cancellationToken);
-                var results = await dialogContext.ContinueDialogAsync(cancellationToken);
+                var dialogStatus = DialogTurnStatus.Empty;
+                if (dialogContext.Dialogs != null)
+                {
+                    var results = await dialogContext.ContinueDialogAsync(cancellationToken);
+                    dialogStatus = results.Status;
+                }
 
                 // We are not in a dialog, so resume turns as normal
-                if (results.Status == DialogTurnStatus.Empty)
+                if (dialogStatus == DialogTurnStatus.Empty)
                 {
-                    var activityText = turnContext.Activity.Text.Trim().ToLowerInvariant();
+                    var activityText = turnContext.Activity.Text?.Trim()?.ToLowerInvariant();
 
-                    // start the dialog. We'll do better when we integrate LUIS
-                    if (new[] { "back pain", "start" }.Any(t => t == activityText))
+                    if (activityText == null)
                     {
+                        var jsonData = turnContext.Activity.Value as JObject;
+                        var postBackAction = jsonData?.GetValue("ActionType")?.Value<string>();
+                        if (postBackAction == null)
+                        {
+                            return;
+                        }
+
+                        switch (postBackAction)
+                        {
+                            case PostBackActions.StartBackPainSurvey:
+                                await dialogContext.BeginDialogAsync(
+                                    BackPainDialogFactory.DialogId,
+                                    cancellationToken: cancellationToken);
+                                break;
+                            case PostBackActions.SubmitBackPainData:
+                                var backPainDemographics = jsonData["Data"].ToObject<BackPainDemographics>();
+                                Debugger.Break();
+                                break;
+                            case PostBackActions.Default:
+                                break;
+                            default:
+                                throw new InvalidOperationException($"The PostBack action type {postBackAction} was not recognized.");
+                        }
+                    }
+                    else if (new[] { "back pain", "start" }.Any(t => t == activityText))
+                    {
+                        // start the dialog. We'll do better when we integrate LUIS
                         await dialogContext.BeginDialogAsync(
                             BackPainDialogFactory.DialogId,
                             cancellationToken: cancellationToken);

@@ -1,10 +1,14 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using AdaptiveCards;
+using BackMeUp.Messages;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Dialogs.Choices;
-using Newtonsoft.Json;
+using Microsoft.Bot.Schema;
 
 namespace BackMeUp.Dialogs.BackPain
 {
@@ -13,10 +17,15 @@ namespace BackMeUp.Dialogs.BackPain
         public const string DialogId = "back-pain";
 
         private readonly DialogAccessors _accessors;
+        private readonly string _hostAddress;
 
-        public BackPainDialogFactory(DialogAccessors accessors)
+        public BackPainDialogFactory(
+            DialogAccessors accessors,
+            IHttpContextAccessor httpAccessor)
         {
             _accessors = accessors;
+            var request = httpAccessor.HttpContext.Request;
+            _hostAddress = $"{request.Scheme}://{request.Host}";
         }
 
         public Dialog Configure(DialogSet dialogSet)
@@ -321,7 +330,7 @@ Some of the questions will be very personal. While we do use the information you
             WaterfallStepContext stepContext,
             CancellationToken cancellationToken)
         {
-            BackPainDemographics demographics = await _accessors.BackPainDemographics.GetAsync(
+            var demographics = await _accessors.BackPainDemographics.GetAsync(
                 stepContext.Context,
                 () => new BackPainDemographics(),
                 cancellationToken);
@@ -340,34 +349,110 @@ Some of the questions will be very personal. While we do use the information you
             WaterfallStepContext stepContext,
             CancellationToken cancellationToken)
         {
-            var state = await _accessors.BackPainDemographics.GetAsync(
+            var demographics = await _accessors.BackPainDemographics.GetAsync(
                 stepContext.Context,
                 () => new BackPainDemographics(),
                 cancellationToken);
             var race = (FoundChoice)stepContext.Result;
-            state.Race = BackPainTranslations.Races[race.Value].code;
+            demographics.Race = BackPainTranslations.Races[race.Value].code;
 
-            // reflect the user's answers back. This is retrieved from state
-            var serialized = JsonConvert.SerializeObject(state, Formatting.Indented);
-            await stepContext.Context.SendActivityAsync(MessageFactory.Text(serialized), cancellationToken);
+            await DisplaySummaryAsync(stepContext, demographics, cancellationToken);
+
             return await stepContext.EndDialogAsync(cancellationToken: cancellationToken);
+        }
+
+        private async Task DisplaySummaryAsync(WaterfallStepContext stepContext, BackPainDemographics demographics, CancellationToken cancellationToken)
+        {
+            var card = new AdaptiveCard
+            {
+                Speak = "<s>Submission Summary</s>. Please review for accuracy.",
+                Body = new List<CardElement>
+                {
+                    new TextBlock
+                    {
+                        Text = "Submission Summary",
+                        Size = TextSize.Large,
+                        Weight = TextWeight.Bolder,
+                    },
+                    new TextBlock
+                    {
+                        Text = "Please review for accuracy.",
+                    },
+                    new ColumnSet
+                    {
+                        Columns = new List<Column>
+                        {
+                            new Column
+                            {
+                                Items = new List<CardElement>
+                                {
+                                    new Image
+                                    {
+                                        Url = $"{_hostAddress}/images/check-mark.png",
+                                        AltText = "check mark",
+                                        Size = ImageSize.Medium,
+                                    },
+                                },
+                                Size = ColumnSize.Auto,
+                            },
+                            new Column
+                            {
+                                Items = new List<CardElement>
+                                {
+                                    new FactSet
+                                    {
+                                        Facts = demographics.ToFactList(),
+                                    },
+                                },
+                                Size = ColumnSize.Stretch,
+                            },
+                        },
+                    },
+                },
+                Actions = new List<ActionBase>
+                {
+                    new SubmitAction
+                    {
+                        Title = "Continue",
+                        Data = new PostBackData<BackPainDemographics>(PostBackActions.SubmitBackPainData, demographics),
+                    },
+                    new SubmitAction
+                    {
+                        Title = "Start Over",
+                        Data = new PostBackData<string>(PostBackActions.StartBackPainSurvey, string.Empty),
+                    },
+                    new SubmitAction
+                    {
+                        Title = "Cancel",
+                        Data = new PostBackData<string>(PostBackActions.Default, string.Empty),
+                    },
+                },
+            };
+
+            var attachment = new Attachment
+            {
+                ContentType = AdaptiveCard.ContentType,
+                Content = card,
+            };
+            await stepContext.Context.SendActivityAsync(MessageFactory.Attachment(attachment), cancellationToken);
         }
 
         private void RegisterPrompts(DialogSet dialogSet)
         {
-            dialogSet.Add(new ConfirmPrompt(Prompts.ConfirmStart));
-            dialogSet.Add(new NumberPrompt<int>(Prompts.Age, ValidateAgeAsync));
-            dialogSet.Add(new ChoicePrompt(Prompts.BiologicalSex));
-            dialogSet.Add(new ConfirmPrompt(Prompts.CancerHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.PsychCareHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.PhysicalTherapyHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.CognitiveBehavioralTherapyHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.PreviousBackSurgeryHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.FeverHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.FecalIncontinenceHistory));
-            dialogSet.Add(new ConfirmPrompt(Prompts.OpioidUse));
-            dialogSet.Add(new ChoicePrompt(Prompts.LevelOfPain));
-            dialogSet.Add(new ChoicePrompt(Prompts.Race));
+            dialogSet
+                .Add(new ConfirmPrompt(Prompts.ConfirmStart))
+                .Add(new NumberPrompt<int>(Prompts.Age, ValidateAgeAsync))
+                .Add(new ChoicePrompt(Prompts.BiologicalSex))
+                .Add(new ConfirmPrompt(Prompts.CancerHistory))
+                .Add(new ConfirmPrompt(Prompts.PsychCareHistory))
+                .Add(new ConfirmPrompt(Prompts.PhysicalTherapyHistory))
+                .Add(new ConfirmPrompt(Prompts.CognitiveBehavioralTherapyHistory))
+                .Add(new ConfirmPrompt(Prompts.PreviousBackSurgeryHistory))
+                .Add(new ConfirmPrompt(Prompts.FeverHistory))
+                .Add(new ConfirmPrompt(Prompts.FecalIncontinenceHistory))
+                .Add(new ConfirmPrompt(Prompts.OpioidUse))
+                .Add(new ChoicePrompt(Prompts.LevelOfPain))
+                .Add(new ChoicePrompt(Prompts.Race));
         }
 
         private static class Prompts

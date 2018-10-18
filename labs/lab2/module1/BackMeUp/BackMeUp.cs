@@ -40,10 +40,15 @@ namespace BackMeUp
             if (turnContext.Activity.Type == ActivityTypes.Message)
             {
                 var dialogContext = await _dialogs.CreateContextAsync(turnContext, cancellationToken);
-                var results = await dialogContext.ContinueDialogAsync(cancellationToken);
+                var dialogStatus = DialogTurnStatus.Empty;
+                if (dialogContext.Dialogs != null)
+                {
+                    var results = await dialogContext.ContinueDialogAsync(cancellationToken);
+                    dialogStatus = results.Status;
+                }
 
                 // We are not in a dialog, so resume turns as normal
-                if (results.Status == DialogTurnStatus.Empty)
+                if (dialogStatus == DialogTurnStatus.Empty)
                 {
                     var activityText = turnContext.Activity.Text.Trim().ToLowerInvariant();
 

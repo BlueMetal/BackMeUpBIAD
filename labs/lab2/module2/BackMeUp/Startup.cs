@@ -4,6 +4,8 @@ using BackMeUp.Dialogs;
 using BackMeUp.Dialogs.BackPain;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.StaticFiles.Infrastructure;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Integration;
@@ -44,6 +46,9 @@ namespace BackMeUp
             // Loads .bot configuration file and adds a singleton that your Bot can access through dependency injection.
             var botConfig = BotConfiguration.Load(botFilePath ?? @".\BotConfiguration.bot", secretKey);
             services.AddSingleton(sp => botConfig ?? throw new InvalidOperationException($"The .bot config file could not be loaded. ({botConfig})"));
+
+            // This gives us access to the HTTP context. We can use this to determine the host address
+            services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
             // Retrieve current endpoint.
             var environment = _isProduction ? "production" : "development";
@@ -107,7 +112,7 @@ namespace BackMeUp
         {
             // Set the CredentialProvider for the bot. It uses this to authenticate with the QnA service in Azure
             options.CredentialProvider = credentialProvider
-                ?? throw new InvalidOperationException("Missing endpoint information from bot configuraiton file.");
+                ?? throw new InvalidOperationException("Missing endpoint information from bot configuration file.");
 
             // Creates a logger for the application to use.
             ILogger logger = loggerFactory.CreateLogger<T>();

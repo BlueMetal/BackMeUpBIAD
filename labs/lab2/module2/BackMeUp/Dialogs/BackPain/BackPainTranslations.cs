@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Bot.Builder.Dialogs.Choices;
+using Microsoft.Bot.Schema;
+using Fact = AdaptiveCards.Fact;
 
 namespace BackMeUp.Dialogs.BackPain
 {
@@ -21,6 +23,22 @@ namespace BackMeUp.Dialogs.BackPain
                 {"76911", "Physiatry"},
                 {"63030", "Posterior Lamina Removal with Decomp"},
             };
+
+        public static readonly List<Choice> ConfirmCompleteChoices = new List<Choice>
+        {
+            new Choice("Continue")
+            {
+                Synonyms = new List<string> { "yes", "confirm", "affirmative" },
+            },
+            new Choice("Start Over")
+            {
+                Synonyms = new List<string> { "retry" },
+            },
+            new Choice("Cancel")
+            {
+                Synonyms = new List<string> { "quit", "exit", "bye" },
+            },
+        };
 
         public static readonly List<Choice> PainLevelOptions = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }.Select(x => new Choice(x.ToString())).ToList();
 
@@ -73,5 +91,26 @@ namespace BackMeUp.Dialogs.BackPain
                 "Other", ("U", new Choice("Other"))
             },
         };
+
+        public static List<Fact> ToFactList(this BackPainDemographics source)
+        {
+            var race = Races.Single(r => r.Value.code == source.Race).Key;
+
+            return new List<Fact>
+            {
+                new Fact("Age", source.Age, $"<s>age</s> {source.Age}"),
+                new Fact("Biological Sex", source.BiologicalSex, $"<s>biological sex</s> {source.BiologicalSex}"),
+                new Fact("History of Cancer", source.CancerHistory, $"<s>cancer history</s> {source.CancerHistory}"),
+                new Fact("Psychiatric Care", source.PsychiatricCare, $"<s>psychiatric care</s> {source.PsychiatricCare}"),
+                new Fact("Physical Therapy", source.HadPhysicalTherapy, $"<s>physical therapy</s> {source.HadPhysicalTherapy}"),
+                new Fact("Cognitive Behavioral Therapy", source.CognitiveBehavioralTherapy, $"<s>cognitive behavioral therapy</s> {source.CognitiveBehavioralTherapy}"),
+                new Fact("Back Surgery", source.PreviousBackSurgery, $"<s>back surgery</s> {source.PreviousBackSurgery}"),
+                new Fact("Fever", source.Fever, $"<s>fever</s> {source.Fever}"),
+                new Fact("Fecal Incontinence", source.FecalIncontinence, $"<s>fecal incontinence</s> {source.FecalIncontinence}"),
+                new Fact("Opioid Use", source.OpioidUse, $"<s>opioid use</s> {source.OpioidUse}"),
+                new Fact("Pain Level", source.LevelOfPain, $"<s>pain level</s> {source.LevelOfPain}"),
+                new Fact("Race", race, $"<s>race</s> {race}"),
+            };
+        }
     }
 }
