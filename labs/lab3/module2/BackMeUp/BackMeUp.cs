@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,6 +7,7 @@ using BackMeUp.Dialogs;
 using BackMeUp.Dialogs.BackPain;
 using BackMeUp.Messages;
 using Microsoft.Bot.Builder;
+using Microsoft.Bot.Builder.AI.Luis;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Schema;
 using Microsoft.Extensions.Logging;
@@ -17,13 +17,13 @@ namespace BackMeUp
 {
     public class BackMeUp : IBot
     {
-        // Module 2
+        private readonly LuisRecognizer _luis;
         private readonly DialogAccessors _accessors;
         private readonly HealthOutcomeService _healthOutcomeService;
         private readonly DialogSet _dialogs;
 
-        // Module 2 add accessors to signature
         public BackMeUp(
+            LuisRecognizer luis,
             DialogAccessors accessors,
             BackPainDialogFactory backPainDialogFactory,
             HealthOutcomeService healthOutcomeService,
@@ -34,7 +34,7 @@ namespace BackMeUp
                 throw new ArgumentNullException(nameof(loggerFactory));
             }
 
-            // Module 2
+            _luis = luis;
             _accessors = accessors;
             _healthOutcomeService = healthOutcomeService;
             _dialogs = new DialogSet(_accessors.DialogState);
@@ -48,6 +48,11 @@ namespace BackMeUp
         {
             if (turnContext.Activity.Type == ActivityTypes.Message)
             {
+                var luisResult = turnContext.Activity.Text == null
+                    ? null
+                    : await _luis.RecognizeAsync(turnContext, cancellationToken);
+                var (luisIntent, _) = luisResult?.GetTopScoringIntent() ?? (null, 0.0);
+
                 var dialogContext = await _dialogs.CreateContextAsync(turnContext, cancellationToken);
                 var dialogStatus = DialogTurnStatus.Empty;
                 if (dialogContext.Dialogs != null)
@@ -80,7 +85,6 @@ namespace BackMeUp
                             case PostBackActions.SubmitBackPainData:
                                 var backPainDemographics = jsonData["Data"].ToObject<BackPainDemographics>();
                                 await PredictBackPainTreatmentAsync(turnContext, backPainDemographics, cancellationToken);
-                                Debugger.Break();
                                 break;
                             case PostBackActions.Default:
                                 break;
@@ -88,16 +92,13 @@ namespace BackMeUp
                                 throw new InvalidOperationException($"The PostBack action type {postBackAction} was not recognized.");
                         }
                     }
-                    else if (new[] { "back pain", "start" }.Any(t => t == activityText))
+                    else if (luisIntent == "Root_Command")
                     {
-                        // start the dialog. We'll do better when we integrate LUIS
-                        await dialogContext.BeginDialogAsync(
-                            BackPainDialogFactory.DialogId,
-                            cancellationToken: cancellationToken);
+                        await ProcessCommandAsync(turnContext, luisResult, dialogContext, cancellationToken);
                     }
                     else
                     {
-                        var responseMessage = MessageFactory.Text($"You said \"{turnContext.Activity.Text}\"");
+                        var responseMessage = MessageFactory.Text($"I'm sorry. I don't know how to do that.");
                         await turnContext.SendActivityAsync(responseMessage, cancellationToken);
                     }
                 }
@@ -107,6 +108,37 @@ namespace BackMeUp
             else
             {
                 await turnContext.SendActivityAsync($"{turnContext.Activity.Type} event detected", cancellationToken: cancellationToken);
+            }
+        }
+
+        private static async Task ProcessCommandAsync(
+            ITurnContext turnContext,
+            RecognizerResult luisResult,
+            DialogContext dialogContext,
+            CancellationToken cancellationToken)
+        {
+            var commands = luisResult?.Entities["Command"]?.ToObject<string[][]>();
+            if (commands == null || commands.Length == 0 || commands[0].Length == 0)
+            {
+                var responseMessage = MessageFactory.Text(
+                    "We're here to help. Try typing \"help me with back pain\"");
+                await turnContext.SendActivityAsync(responseMessage, cancellationToken);
+                return;
+            }
+
+            var theCommand = commands[0][0];
+            switch (theCommand)
+            {
+                case "back pain":
+                    await dialogContext.BeginDialogAsync(
+                        BackPainDialogFactory.DialogId,
+                        cancellationToken: cancellationToken);
+                    break;
+                default:
+                    var responseMessage = MessageFactory.Text(
+                        "I'm sorry. I can't help you with that. Try typing \"help me with back pain\"");
+                    await turnContext.SendActivityAsync(responseMessage, cancellationToken);
+                    break;
             }
         }
 

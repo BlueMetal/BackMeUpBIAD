@@ -8,6 +8,16 @@
       "appId": "",
       "appPassword": "",
       "id": "1"
+    },
+    {
+      "type": "luis",
+      "name": "BackMeUp",
+      "appId": "a5e32b26-cb22-4cf0-9621-8ee883bc1fb9",
+      "version": "0.1",
+      "authoringKey": "",
+      "subscriptionKey": "b2684a48b7594873afcf90b7f72b9e4c",
+      "region": "westus",
+      "id": "2"
     }
   ],
   "padlock": "",

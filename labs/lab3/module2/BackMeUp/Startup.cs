@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles.Infrastructure;
 using Microsoft.Bot.Builder;
+using Microsoft.Bot.Builder.AI.Luis;
 using Microsoft.Bot.Builder.Dialogs;
 using Microsoft.Bot.Builder.Integration;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
@@ -64,6 +65,23 @@ namespace BackMeUp
                         if (service is EndpointService endpointService)
                         {
                             credentialProvider = new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
+                        }
+
+                        break;
+                    case ServiceTypes.Luis:
+                        if (service is LuisService luisService)
+                        {
+                            var luisAppRegion = luisService.Region ?? throw new InvalidOperationException("The LUIS configuration must include region property");
+                            services.AddSingleton(sp => new LuisApplication(
+                                luisService.AppId ?? throw new InvalidOperationException("The LUIS configuration must include appId property"),
+                                luisService.SubscriptionKey ?? throw new InvalidOperationException("The LUIS configuration must include subscriptionKey property"),
+                                $"https://{luisAppRegion}.api.cognitive.microsoft.com"));
+                            services.AddTransient(sp => new LuisRecognizer(
+                                sp.GetService<LuisApplication>(),
+                                new LuisPredictionOptions
+                                {
+                                    IncludeAllIntents = true,
+                                }));
                         }
 
                         break;
