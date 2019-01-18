@@ -506,4 +506,4 @@ Check out the GitHub Project https://github.com/Microsoft/BotBuilder-Personality
 
 Explore the documentation for chit chat (https://docs.microsoft.com/en-us/azure/cognitive-services/qnamaker/how-to/chit-chat-knowledge-base) and augment the chit chat you added in the previous exercise with new QnA
 
-[<< Home](README.md) | [>Lab 2](Lab2.md)
+[<< Home](README.md) | [Lab 2>](Lab2.md)
