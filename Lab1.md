@@ -306,3 +306,204 @@ Change the "Target Framework" to ".Net Core 2.1" in the project properties
 
 #### 1M4E2 Step 3
 
+Click “Managed NuGet Packages” in the “Dependencies” context menu for the project. This is because you won’t be able to update the packages (next step) until you do so.
+
+![Select Manage NuGet Packages](images/l1m4-12.png)
+
+#### 1M4E2 Step 4
+
+You’ll need to update your packages before importing the QnA package
+
+![Update Packages](images/l1m4-13.png)
+
+#### 1M4E2 Step 5
+
+Navigate to “Browse”, and add “Microsoft.Bot.Builder.AI.QnA”
+
+![Download Package](images/l1m4-14.png)
+
+### Exercise 3: Prepare Project for QnA
+
+#### 1M4E3 Step 1
+
+Change the name of EchoWithCounterBot to HalBot
+
+#### 1M4E3 Step 2
+
+Locate “BotConfiguration.bot”. Paste the following configuration at the end of the “services” collection.
+
+``` json
+{
+    "type": "qna",
+    "name": "hal-bot-9000",
+    "kbId": "",
+    "endpointKey": "",
+    "hostname": "",
+    "id": "2"
+}
+```
+
+#### 1M4E3 Step 3
+
+In the KB you just created on https://www.qnamaker.ai, navigate to “SETTINGS” to get “kbID”, “endpointKey”, and “hostname”
+
+![Screenshot of settings](images/l1m4-15.png)
+
+### Exercise 4: Add QnAMaker Service
+
+> .Net Core uses dependency injection to provide services to its middleware. We register dependencies using the IServicesCollection interface provided to the ConfigureServices method of Startup.cs.
+
+#### 1M4E4 Step 1
+
+Delete the file EchoBotAccessors.cs
+
+#### 1M4E4 Step 2
+
+Delete the file CounterState.cs
+
+#### 1M4E4 Step 3
+
+Remove the EchoBotAccessors references from HalBot.cs
+
+   1. Remove from constructor signature
+   1. Remove from constructor body
+   1. Remove from fields
+
+#### 1M4E4 Step 4
+
+Open Startup.cs
+
+#### 1M4E4 Step 5
+
+Add a method to configure the bot
+
+``` csharp
+private void ConfigureBot(BotFrameworkOptions options, ICredentialProvider credentialProvider)
+{
+    // Set the CredentialProvider for the bot. It uses this to authenticate with the QnA service in Azure
+    options.CredentialProvider = credentialProvider
+        ?? throw new InvalidOperationException("Missing endpoint information from bot configuraiton file.");
+
+    // Creates a logger for the application to use.
+    ILogger logger = _loggerFactory.CreateLogger<HalBot>();
+
+    // Catches any errors that occur during a conversation turn and logs them.
+    options.OnTurnError = async (context, exception) =>
+    {
+        logger.LogError($"Exception caught : {exception}");
+        await context.SendActivityAsync("Sorry, it looks like something went wrong.");
+    };
+
+    // The Memory Storage used here is for local bot debugging only. When the bot
+    // is restarted, everything stored in memory will be gone.
+    IStorage dataStore = new MemoryStorage();
+
+    // Create Conversation State object.
+    // The Conversation State object is where we persist anything at the conversation-scope.
+    var conversationState = new ConversationState(dataStore);
+
+    options.State.Add(conversationState);
+}
+```
+
+#### 1M4E4 Step 6
+
+Replace the contents of the ConfigureServices method with the following:
+
+``` csharp
+var secretKey = Configuration.GetSection("botFileSecret")?.Value;
+var botFilePath = Configuration.GetSection("botFilePath")?.Value;
+
+// Loads .bot configuration file and adds a singleton that your Bot can access through dependency injection.
+var botConfig = BotConfiguration.Load(botFilePath ?? @".\BotConfiguration.bot", secretKey);
+services.AddSingleton(sp => botConfig ?? throw new InvalidOperationException($"The .bot config file could not be loaded. ({botConfig})"));
+
+// Retrieve current endpoint.
+var environment = _isProduction ? "production" : "development";
+
+ICredentialProvider credentialProvider = null;
+
+foreach (var service in botConfig.Services)
+{
+    switch (service.Type)
+    {
+        case ServiceTypes.Endpoint:
+            if (service is EndpointService endpointService)
+            {
+                credentialProvider = new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
+            }
+
+            break;
+        case ServiceTypes.QnA:
+            if (service is QnAMakerService qnaMakerService)
+            {
+                var qnaEndpoint = new QnAMakerEndpoint
+                {
+                    Host = qnaMakerService.Hostname,
+                    EndpointKey = qnaMakerService.EndpointKey,
+                    KnowledgeBaseId = qnaMakerService.KbId,
+                };
+                services.AddSingleton(new QnAMaker(qnaEndpoint));
+            }
+
+            break;
+    }
+}
+
+services.AddBot<HalBot>(options => ConfigureBot(options, credentialProvider));
+```
+
+#### 1M4E4 Step 7
+
+Add QnAMaker to the constructor and state of the HalBot class
+
+![Adding QnAMaker to the constructor](images/l1m4-16.png)
+
+   1. Add to fields
+   1. Add to constructor signature
+   1. Add to constructor body
+
+#### 1M4E4 Step 8
+
+Replace the contents of the OnTurnAsync method with the following:
+
+``` csharp
+if (turnContext.Activity.Type == ActivityTypes.Message)
+{
+    if (string.IsNullOrWhiteSpace(turnContext.Activity.Text))
+    {
+        await turnContext.SendActivityAsync(MessageFactory.Text("This doesn't work unless you say something first."), cancellationToken);
+        return;
+    }
+
+    var results = await _qnaMaker.GetAnswersAsync(turnContext).ConfigureAwait(false);
+
+    if (results.Any())
+    {
+        var topResult = results.First();
+        await turnContext.SendActivityAsync(MessageFactory.Text(topResult.Answer), cancellationToken);
+    }
+    else
+    {
+        await turnContext.SendActivityAsync(MessageFactory.Text("I'm sorry Dave, I don't understand you."), cancellationToken);
+    }
+}
+else
+{
+    await turnContext.SendActivityAsync($"{turnContext.Activity.Type} event detected");
+}
+```
+
+#### 1M4E4 Step 9
+
+Run the code and test the bot using the Bot Framework Emulator.
+
+### Lab1 Module 4 Bonus Exercise 1
+
+Check out the GitHub Project https://github.com/Microsoft/BotBuilder-PersonalityChat/tree/master/CSharp/Datasets. Add a chitchat dataset to your service.
+
+### Lab1 Module 4 Bonus Exercise 2
+
+Explore the documentation for chit chat (https://docs.microsoft.com/en-us/azure/cognitive-services/qnamaker/how-to/chit-chat-knowledge-base) and augment the chit chat you added in the previous exercise with new QnA
+
+[<< Home](README.md) | [>Lab 2](Lab2.md)
