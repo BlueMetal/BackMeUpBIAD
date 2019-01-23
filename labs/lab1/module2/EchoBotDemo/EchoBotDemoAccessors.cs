@@ -12,14 +12,14 @@ namespace EchoBotDemo
     ///  - See the Startup.cs file for more details on creating the Singleton that gets
     ///    injected into the constructor.
     /// </summary>
-    public class EchoBotAccessors
+    public class EchoBotDemoAccessors
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="EchoBotAccessors"/> class.
+        /// Initializes a new instance of the class.
         /// Contains the <see cref="ConversationState"/> and associated <see cref="IStatePropertyAccessor{T}"/>.
         /// </summary>
         /// <param name="conversationState">The state object that stores the counter.</param>
-        public EchoBotAccessors(ConversationState conversationState)
+        public EchoBotDemoAccessors(ConversationState conversationState)
         {
             ConversationState = conversationState ?? throw new ArgumentNullException(nameof(conversationState));
         }
@@ -29,14 +29,7 @@ namespace EchoBotDemo
         /// </summary>
         /// <remarks>Accessors require a unique name.</remarks>
         /// <value>The accessor name for the counter accessor.</value>
-        public static string CounterStateName { get; } = $"{nameof(EchoBotAccessors)}.CounterState";
-
-        /// <summary>
-        /// Gets the <see cref="IStatePropertyAccessor{T}"/> name used for the <see cref="Lab1State"/> accessor.
-        /// </summary>
-        /// <remarks>Bonus Excercise 2.</remarks>
-        /// <value>The accessor name for the lab 1 accessor.</value>
-        public static string Lab1StateName { get; } = $"{nameof(EchoBotAccessors)}.{nameof(Lab1State)}";
+        public static string CounterStateName { get; } = $"{nameof(EchoBotDemoAccessors)}.CounterState";
 
         /// <summary>
         /// Gets or sets the <see cref="IStatePropertyAccessor{T}"/> for CounterState.
@@ -45,15 +38,6 @@ namespace EchoBotDemo
         /// The accessor stores the turn count for the conversation.
         /// </value>
         public IStatePropertyAccessor<CounterState> CounterState { get; set; }
-
-        /// <summary>
-        /// Gets or sets the <see cref="IStatePropertyAccessor{T}"/> for Lab1State.
-        /// </summary>
-        /// <remarks>Bonus Exercise 2.</remarks>
-        /// <value>
-        /// The accessor stores Lab 2 data for the conversation.
-        /// </value>
-        public IStatePropertyAccessor<Lab1State> Lab1State { get; set; }
 
         /// <summary>
         /// Gets the <see cref="ConversationState"/> object for the conversation.

@@ -20,26 +20,26 @@ namespace EchoBotDemo
     /// <see cref="IStatePropertyAccessor{T}"/> object are created with a singleton lifetime.
     /// </summary>
     /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.1"/>
-    public class EchoWithCounterBot : IBot
+    public class EchoBotDemoBot : IBot
     {
-        private readonly EchoBotAccessors _accessors;
+        private readonly EchoBotDemoAccessors _accessors;
         private readonly ILogger _logger;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="EchoWithCounterBot"/> class.
+        /// Initializes a new instance of the class.
         /// </summary>
         /// <param name="accessors">A class containing <see cref="IStatePropertyAccessor{T}"/> used to manage state.</param>
         /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> that is hooked to the Azure App Service provider.</param>
         /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-2.1#windows-eventlog-provider"/>
-        public EchoWithCounterBot(EchoBotAccessors accessors, ILoggerFactory loggerFactory)
+        public EchoBotDemoBot(EchoBotDemoAccessors accessors, ILoggerFactory loggerFactory)
         {
             if (loggerFactory == null)
             {
                 throw new System.ArgumentNullException(nameof(loggerFactory));
             }
 
-            _logger = loggerFactory.CreateLogger<EchoWithCounterBot>();
-            _logger.LogTrace("EchoBot turn start.");
+            _logger = loggerFactory.CreateLogger<EchoBotDemoBot>();
+            _logger.LogTrace("Turn start.");
             _accessors = accessors ?? throw new System.ArgumentNullException(nameof(accessors));
         }
 
@@ -69,81 +69,46 @@ namespace EchoBotDemo
                 // Bump the turn count for this conversation.
                 state.TurnCount++;
 
-                // Set the property using the accessor.
-                await _accessors.CounterState.SetAsync(turnContext, state);
-
-                // Bonus Exercise 1
-                // Get an invariant version of the text that has been trimmed of whitespace and punctuation
-                var activityText = turnContext.Activity.Text.TrimEnd(",.?".ToCharArray()).Trim().ToLowerInvariant();
-
-                // Bonus Exercise 2
-                // If the user giving us a name, put it in state.
-                var acknowledgeUserName = false;
-
-                // Gets a new or existing instance of Lab1State
-                var lab1State = await _accessors.Lab1State.GetAsync(turnContext, () => new Lab1State(), cancellationToken: cancellationToken);
-
-                // Check to see if the user is sharing their name. This will get much easier with LUIS
-                if (activityText.StartsWith("my name is"))
-                {
-                    // Extract name from the text
-                    var name = turnContext.Activity.Text.Trim().Substring(10).TrimStart();
-
-                    // add the name to the state object
-                    lab1State.Name = name;
-                    lab1State.WaitingForName = false;
-
-                    // Update the state in the Accessors instance
-                    await _accessors.Lab1State.SetAsync(turnContext, lab1State, cancellationToken);
-                    acknowledgeUserName = true;
-                }
-                else if (lab1State.WaitingForName)
-                {
-                    lab1State.Name = turnContext.Activity.Text;
-                    lab1State.WaitingForName = false;
-
-                    // Update the state in the Accessors instance
-                    await _accessors.Lab1State.SetAsync(turnContext, lab1State, cancellationToken);
-                    acknowledgeUserName = true;
-                }
-
-                // Bonus Exercise 1
+                // BEGIN Bonus Exercises
+                var text = turnContext.Activity.Text;
+                var textLower = text.ToLowerInvariant();
                 string responseMessage;
-                if (activityText == "marco")
+                if (textLower == "marco")
                 {
+                    // Bonus Exercise 1
                     responseMessage = "Polo";
                 }
-
-                // Bonus Exercise 2
-                else if (acknowledgeUserName)
+                else if (textLower.StartsWith("my name is "))
                 {
-                    responseMessage = $"Greetings {lab1State.Name}. I'll remember your name.";
+                    // Bonus Exercise 2
+                    var name = text.Substring("my name is ".Length);
+                    state.Name = name;
+                    responseMessage = $"Thanks {name}. I'll remember that.";
                 }
-
-                // Bonus Exercise 3
-                else if (!lab1State.HasSaidHello && activityText == "hello")
+                else if (textLower == "hello")
                 {
-                    if (string.IsNullOrEmpty(lab1State.Name))
+                    // Bonus Exercise 3
+                    if (state.Name == null)
                     {
-                        responseMessage = "Hello. What is your name?";
-                        lab1State.WaitingForName = true;
+                        responseMessage = "Hello, it's nice to meet you.";
                     }
                     else
                     {
-                        responseMessage = $"Hello {lab1State.Name}. It's a pleasure to speak with you.";
+                        responseMessage = $"Hello {state.Name}, it's nice to meet you.";
                     }
-
-                    lab1State.HasSaidHello = true;
-                    await _accessors.Lab1State.SetAsync(turnContext, lab1State, cancellationToken);
                 }
                 else
                 {
                     // Echo back to the user whatever they typed.
                     responseMessage = $"Turn {state.TurnCount}: You sent '{turnContext.Activity.Text}'\n";
                 }
+                // END Bonus Exercises
 
-                // Only save state once
-                await _accessors.ConversationState.SaveChangesAsync(turnContext, cancellationToken: cancellationToken);
+                // Set the property using the accessor.
+                await _accessors.CounterState.SetAsync(turnContext, state);
+
+                // Save the new turn count into the conversation state.
+                await _accessors.ConversationState.SaveChangesAsync(turnContext);
 
                 await turnContext.SendActivityAsync(responseMessage);
             }

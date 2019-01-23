@@ -23,7 +23,7 @@ namespace EchoBotDemo
     public class Startup
     {
         private ILoggerFactory _loggerFactory;
-        private bool _isProduction = false;
+        private readonly bool _isProduction;
 
         public Startup(IHostingEnvironment env)
         {
@@ -54,34 +54,34 @@ namespace EchoBotDemo
         /// <seealso cref="https://docs.microsoft.com/en-us/azure/bot-service/bot-service-manage-channels?view=azure-bot-service-4.0"/>
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddBot<EchoWithCounterBot>(options =>
-            {
-                var secretKey = Configuration.GetSection("botFileSecret")?.Value;
-                var botFilePath = Configuration.GetSection("botFilePath")?.Value;
+            services.AddBot<EchoBotDemoBot>(options =>
+           {
+               var secretKey = Configuration.GetSection("botFileSecret")?.Value;
+               var botFilePath = Configuration.GetSection("botFilePath")?.Value;
 
                 // Loads .bot configuration file and adds a singleton that your Bot can access through dependency injection.
-                var botConfig = BotConfiguration.Load(botFilePath ?? @".\BotConfiguration.bot", secretKey);
-                services.AddSingleton(sp => botConfig ?? throw new InvalidOperationException($"The .bot config file could not be loaded. ({botConfig})"));
+                var botConfig = BotConfiguration.Load(botFilePath ?? @".\EchoBotDemo.bot", secretKey);
+               services.AddSingleton(sp => botConfig ?? throw new InvalidOperationException($"The .bot config file could not be loaded. ({botConfig})"));
 
                 // Retrieve current endpoint.
                 var environment = _isProduction ? "production" : "development";
-                var service = botConfig.Services.Where(s => s.Type == "endpoint" && s.Name == environment).FirstOrDefault();
-                if (!(service is EndpointService endpointService))
-                {
-                    throw new InvalidOperationException($"The .bot file does not contain an endpoint with name '{environment}'.");
-                }
+               var service = botConfig.Services.FirstOrDefault(s => s.Type == "endpoint" && s.Name == environment);
+               if (!(service is EndpointService endpointService))
+               {
+                   throw new InvalidOperationException($"The .bot file does not contain an endpoint with name '{environment}'.");
+               }
 
-                options.CredentialProvider = new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
+               options.CredentialProvider = new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
 
                 // Creates a logger for the application to use.
-                ILogger logger = _loggerFactory.CreateLogger<EchoWithCounterBot>();
+                ILogger logger = _loggerFactory.CreateLogger<EchoBotDemoBot>();
 
                 // Catches any errors that occur during a conversation turn and logs them.
                 options.OnTurnError = async (context, exception) =>
-                {
-                    logger.LogError($"Exception caught : {exception}");
-                    await context.SendActivityAsync("Sorry, it looks like something went wrong.");
-                };
+               {
+                   logger.LogError($"Exception caught : {exception}");
+                   await context.SendActivityAsync("Sorry, it looks like something went wrong.");
+               };
 
                 // The Memory Storage used here is for local bot debugging only. When the bot
                 // is restarted, everything stored in memory will be gone.
@@ -109,38 +109,34 @@ namespace EchoBotDemo
                 // The Conversation State object is where we persist anything at the conversation-scope.
                 var conversationState = new ConversationState(dataStore);
 
-                options.State.Add(conversationState);
-            });
+               options.State.Add(conversationState);
+           });
 
-            // Create and register state accesssors.
-            // Acessors created here are passed into the IBot-derived class on every turn.
-            services.AddSingleton<EchoBotAccessors>(sp =>
-            {
-                var options = sp.GetRequiredService<IOptions<BotFrameworkOptions>>().Value;
-                if (options == null)
-                {
-                    throw new InvalidOperationException("BotFrameworkOptions must be configured prior to setting up the state accessors");
-                }
+            // Create and register state accessors.
+            // Accessors created here are passed into the IBot-derived class on every turn.
+            services.AddSingleton<EchoBotDemoAccessors>(sp =>
+           {
+               var options = sp.GetRequiredService<IOptions<BotFrameworkOptions>>().Value;
+               if (options == null)
+               {
+                   throw new InvalidOperationException("BotFrameworkOptions must be configured prior to setting up the state accessors");
+               }
 
-                var conversationState = options.State.OfType<ConversationState>().FirstOrDefault();
-                if (conversationState == null)
-                {
-                    throw new InvalidOperationException("ConversationState must be defined and added before adding conversation-scoped state accessors.");
-                }
+               var conversationState = options.State.OfType<ConversationState>().FirstOrDefault();
+               if (conversationState == null)
+               {
+                   throw new InvalidOperationException("ConversationState must be defined and added before adding conversation-scoped state accessors.");
+               }
 
                 // Create the custom state accessor.
                 // State accessors enable other components to read and write individual properties of state.
-                var accessors = new EchoBotAccessors(conversationState)
-                {
-                    CounterState = conversationState.CreateProperty<CounterState>(EchoBotAccessors.CounterStateName),
+                var accessors = new EchoBotDemoAccessors(conversationState)
+               {
+                   CounterState = conversationState.CreateProperty<CounterState>(EchoBotDemoAccessors.CounterStateName),
+               };
 
-                    // Bonus Exercise 2
-                    // This initializes our new state object with teh Accessors instance. It can now be used to manage state in the middleware
-                    Lab1State = conversationState.CreateProperty<Lab1State>(EchoBotAccessors.Lab1StateName),
-                };
-
-                return accessors;
-            });
+               return accessors;
+           });
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)

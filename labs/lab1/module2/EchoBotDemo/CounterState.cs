@@ -15,5 +15,7 @@ namespace EchoBotDemo
         /// </summary>
         /// <value>The number of turns in the conversation.</value>
         public int TurnCount { get; set; } = 0;
+
+        public string Name { get; set; } = null;
     }
 }
