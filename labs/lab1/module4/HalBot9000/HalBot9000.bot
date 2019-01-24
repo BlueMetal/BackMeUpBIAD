@@ -1,0 +1,24 @@
+{
+  "name": "HalBot9000",
+  "description": "",
+  "services": [
+    {
+      "type": "endpoint",
+      "name": "development",
+      "endpoint": "http://localhost:3978/api/messages",
+      "appId": "",
+      "appPassword": "",
+      "id": "1"
+    },
+    {
+      "type": "qna",
+      "name": "hal-bot-9000",
+      "kbId": "A GUID VALUE",
+      "endpointKey": "ANOTHER GUID VALUE",
+      "hostname": "https://YOUR_SERVICE_NAME.azurewebsites.net/qnamaker",
+      "id": "2"
+    }
+  ],
+  "padlock": "",
+  "version": "2.0"
+}

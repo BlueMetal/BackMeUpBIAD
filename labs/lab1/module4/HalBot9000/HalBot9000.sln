@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.28010.2046
+VisualStudioVersion = 15.0.28307.271
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HalBot9000", "HalBot9000.csproj", "{8BA46C6D-4691-4AC3-A84D-3B451AA54CED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HalBot9000", "HalBot9000.csproj", "{0372A5D9-D3EE-4B5B-9EAA-6B329D916540}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{8BA46C6D-4691-4AC3-A84D-3B451AA54CED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8BA46C6D-4691-4AC3-A84D-3B451AA54CED}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8BA46C6D-4691-4AC3-A84D-3B451AA54CED}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8BA46C6D-4691-4AC3-A84D-3B451AA54CED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0372A5D9-D3EE-4B5B-9EAA-6B329D916540}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0372A5D9-D3EE-4B5B-9EAA-6B329D916540}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0372A5D9-D3EE-4B5B-9EAA-6B329D916540}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0372A5D9-D3EE-4B5B-9EAA-6B329D916540}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {A3E4DCE7-BC3D-4A95-AFD3-C8CE51907171}
+		SolutionGuid = {65F60191-427B-4BFF-B3C5-94480853BA5F}
 	EndGlobalSection
 EndGlobal

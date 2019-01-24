@@ -1,127 +1,147 @@
-﻿// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT License.
-
-using System;
+﻿using System;
 using System.Linq;
+using HalBot9000.State;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.AI.QnA;
-using Microsoft.Bot.Builder.Integration;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
 using Microsoft.Bot.Configuration;
 using Microsoft.Bot.Connector.Authentication;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 namespace HalBot9000
 {
     /// <summary>
-    /// The Startup class configures services and the request pipeline.
+    ///     The Startup class configures services and the request pipeline.
     /// </summary>
     public class Startup
     {
+        private readonly bool _isProduction;
         private ILoggerFactory _loggerFactory;
-        private bool _isProduction = false;
 
         public Startup(IHostingEnvironment env)
         {
             _isProduction = env.IsProduction();
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
+                .AddJsonFile("appsettings.json", true, true)
+                .AddJsonFile($"appsettings.{env.EnvironmentName}.json", true)
                 .AddEnvironmentVariables();
 
             Configuration = builder.Build();
         }
 
         /// <summary>
-        /// Gets the configuration that represents a set of key/value application configuration properties.
+        ///     Gets the configuration that represents a set of key/value application configuration properties.
         /// </summary>
         /// <value>
-        /// The <see cref="IConfiguration"/> that represents a set of key/value application configuration properties.
+        ///     The <see cref="IConfiguration" /> that represents a set of key/value application configuration properties.
         /// </value>
         public IConfiguration Configuration { get; }
 
         /// <summary>
-        /// This method gets called by the runtime. Use this method to add services to the container.
+        ///     This method gets called by the runtime. Use this method to add services to the container.
         /// </summary>
-        /// <param name="services">The <see cref="IServiceCollection"/> specifies the contract for a collection of service descriptors.</param>
-        /// <seealso cref="IStatePropertyAccessor{T}"/>
-        /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/web-api/overview/advanced/dependency-injection"/>
-        /// <seealso cref="https://docs.microsoft.com/en-us/azure/bot-service/bot-service-manage-channels?view=azure-bot-service-4.0"/>
+        /// <param name="services">
+        ///     The <see cref="IServiceCollection" /> specifies the contract for a collection of service
+        ///     descriptors.
+        /// </param>
+        /// <seealso cref="IStatePropertyAccessor{T}" />
+        /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/web-api/overview/advanced/dependency-injection" />
+        /// <seealso
+        ///     cref="https://docs.microsoft.com/en-us/azure/bot-service/bot-service-manage-channels?view=azure-bot-service-4.0" />
         public void ConfigureServices(IServiceCollection services)
         {
-            var secretKey = Configuration.GetSection("botFileSecret")?.Value;
-            var botFilePath = Configuration.GetSection("botFilePath")?.Value;
+            // We're going to use MemoryStorage here. This is really only suitable for development.
+            // In a future lab, we'll switch to more robust options.
+            IStorage storage = new MemoryStorage();
 
-            // Loads .bot configuration file and adds a singleton that your Bot can access through dependency injection.
-            var botConfig = BotConfiguration.Load(botFilePath ?? @".\BotConfiguration.bot", secretKey);
-            services.AddSingleton(sp => botConfig ?? throw new InvalidOperationException($"The .bot config file could not be loaded. ({botConfig})"));
+            // declare these here, so we can add them to the services collection outside of the "AddBot" block.
+            // If you try to do "services.AddSingleton" inside of the AddBot block, the HalBot constructor will fail
+            // to get the QnAMaker instance
+            BotConfiguration botConfig = null;
+            QnAMaker qnaMaker = null;
 
-            // Retrieve current endpoint.
-            var environment = _isProduction ? "production" : "development";
-
-            ICredentialProvider credentialProvider = null;
-
-            foreach (var service in botConfig.Services)
+            // Configures the bot
+            services.AddBot<HalBot>(options =>
             {
-                switch (service.Type)
+                var secretKey = Configuration.GetSection("botFileSecret")?.Value;
+                var botFilePath = Configuration.GetSection("botFilePath")?.Value;
+
+                // Loads .bot configuration file and adds a singleton that your Bot can access through dependency injection.
+                botConfig = BotConfiguration.Load(botFilePath ?? @".\HalBot9000.bot", secretKey);
+                
+                // Retrieve current endpoint.
+                var environment = _isProduction ? "production" : "development";
+
+                foreach (var serviceConfig in botConfig.Services)
                 {
-                    case ServiceTypes.Endpoint:
-                        if (service is EndpointService endpointService)
-                        {
-                            credentialProvider = new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
-                        }
-
-                        break;
-                    case ServiceTypes.QnA:
-                        if (service is QnAMakerService qnaMakerService)
-                        {
-                            var qnaEndpoint = new QnAMakerEndpoint
+                    switch (serviceConfig.Type)
+                    {
+                        case ServiceTypes.Endpoint:
+                            if (serviceConfig is EndpointService endpointService)
                             {
-                                Host = qnaMakerService.Hostname,
-                                EndpointKey = qnaMakerService.EndpointKey,
-                                KnowledgeBaseId = qnaMakerService.KbId,
-                            };
-                            services.AddSingleton(new QnAMaker(qnaEndpoint));
-                        }
-
-                        break;
+                                // initialize the credential provider for the bot endpoint
+                                options.CredentialProvider =
+                                    new SimpleCredentialProvider(endpointService.AppId, endpointService.AppPassword);
+                            }
+                            break;
+                        case ServiceTypes.QnA:
+                            if (serviceConfig is QnAMakerService qnaMakerService)
+                            {
+                                // creates a QnA Maker endpoint and allows it to be injected as a singleton
+                                var qnaEndpoint = new QnAMakerEndpoint
+                                {
+                                    Host = qnaMakerService.Hostname,
+                                    EndpointKey = qnaMakerService.EndpointKey,
+                                    KnowledgeBaseId = qnaMakerService.KbId
+                                };
+                                qnaMaker = new QnAMaker(qnaEndpoint);
+                            }
+                            break;
+                        default:
+                            throw new NotImplementedException($"The service type {serviceConfig.Type} is not supported by this bot.");
+                    }
                 }
-            }
 
-            services.AddBot<HalBot>(options => ConfigureBot(options, credentialProvider));
-        }
+                // Creates a logger for the application to use.
+                ILogger logger = _loggerFactory.CreateLogger<HalBot>();
 
-        private void ConfigureBot(BotFrameworkOptions options, ICredentialProvider credentialProvider)
-        {
-            // Set the CredentialProvider for the bot. It uses this to authenticate with the QnA service in Azure
-            options.CredentialProvider = credentialProvider
-                ?? throw new InvalidOperationException("Missing endpoint information from bot configuraiton file.");
+                // Catches any errors that occur during a conversation turn and logs them.
+                options.OnTurnError = async (context, exception) =>
+                {
+                    logger.LogError($"Exception caught : {exception}");
+                    await context.SendActivityAsync("Sorry, it looks like something went wrong.");
+                };
+            });
 
-            // Creates a logger for the application to use.
-            ILogger logger = _loggerFactory.CreateLogger<HalBot>();
+            services.AddSingleton(sp =>
+                botConfig ??
+                throw new InvalidOperationException("The .bot config file could not be loaded."));
+            services.AddSingleton(sp =>
+                qnaMaker ?? throw new InvalidOperationException(
+                    "The QnAMaker was never initialized. Missing configuration in the .bot config file."));
 
-            // Catches any errors that occur during a conversation turn and logs them.
-            options.OnTurnError = async (context, exception) =>
+            // This adds a singleton instance of HalBot9000Accessors to dependency injection.
+            services.AddSingleton(sp =>
             {
-                logger.LogError($"Exception caught : {exception}");
-                await context.SendActivityAsync("Sorry, it looks like something went wrong.");
-            };
+                // Initializes the user state object. This manages the lifecycle of objects scoped to a user.
+                var userState = new UserState(storage);
 
-            // The Memory Storage used here is for local bot debugging only. When the bot
-            // is restarted, everything stored in memory will be gone.
-            IStorage dataStore = new MemoryStorage();
+                // Creates a property accessor for UserProfile that is scoped to the user
+                var userProfilePropertyAccessor =
+                    userState.CreateProperty<UserProfile>(HalBot9000Accessors.UserProfileStateName);
 
-            // Create Conversation State object.
-            // The Conversation State object is where we persist anything at the conversation-scope.
-            var conversationState = new ConversationState(dataStore);
+                var accessors = new HalBot9000Accessors(userState)
+                {
+                    UserProfile = userProfilePropertyAccessor
+                };
 
-            options.State.Add(conversationState);
+                return accessors;
+            });
         }
 
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, ILoggerFactory loggerFactory)

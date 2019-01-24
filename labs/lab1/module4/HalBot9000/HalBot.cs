@@ -4,6 +4,7 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using HalBot9000.State;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.AI.QnA;
 using Microsoft.Bot.Schema;
@@ -11,30 +12,13 @@ using Microsoft.Extensions.Logging;
 
 namespace HalBot9000
 {
-    /// <summary>
-    /// Represents a bot that processes incoming activities.
-    /// For each user interaction, an instance of this class is created and the OnTurnAsync method is called.
-    /// This is a Transient lifetime service.  Transient lifetime services are created
-    /// each time they're requested. For each Activity received, a new instance of this
-    /// class is created. Objects that are expensive to construct, or have a lifetime
-    /// beyond the single turn, should be carefully managed.
-    /// For example, the <see cref="MemoryStorage"/> object and associated
-    /// <see cref="IStatePropertyAccessor{T}"/> object are created with a singleton lifetime.
-    /// </summary>
-    /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection?view=aspnetcore-2.1"/>
     public class HalBot : IBot
     {
-        private readonly QnAMaker _qnaMaker;
+        private readonly HalBot9000Accessors _accessors;
         private readonly ILogger _logger;
+        private readonly QnAMaker _qnAMaker;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="HalBot"/> class.
-        /// </summary>
-        /// <param name="accessors">A class containing <see cref="IStatePropertyAccessor{T}"/> used to manage state.</param>
-        /// <param name="qnaMaker">The service to connect to the QnA Azure service</param>
-        /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> that is hooked to the Azure App Service provider.</param>
-        /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-2.1#windows-eventlog-provider"/>
-        public HalBot(QnAMaker qnaMaker, ILoggerFactory loggerFactory)
+        public HalBot(HalBot9000Accessors accessors, ILoggerFactory loggerFactory, QnAMaker qnAMaker)
         {
             if (loggerFactory == null)
             {
@@ -42,8 +26,9 @@ namespace HalBot9000
             }
 
             _logger = loggerFactory.CreateLogger<HalBot>();
-            _logger.LogTrace("EchoBot turn start.");
-            _qnaMaker = qnaMaker;
+            _logger.LogTrace("Turn start.");
+            _accessors = accessors ?? throw new System.ArgumentNullException(nameof(accessors));
+            _qnAMaker = qnAMaker;
         }
 
         /// <summary>
@@ -61,29 +46,34 @@ namespace HalBot9000
         /// <seealso cref="IMiddleware"/>
         public async Task OnTurnAsync(ITurnContext turnContext, CancellationToken cancellationToken = default(CancellationToken))
         {
+            // we only care about messages in this exercise
             if (turnContext.Activity.Type == ActivityTypes.Message)
             {
+                // It's possible to get blank messages.
                 if (string.IsNullOrWhiteSpace(turnContext.Activity.Text))
                 {
                     await turnContext.SendActivityAsync(MessageFactory.Text("This doesn't work unless you say something first."), cancellationToken);
                     return;
                 }
 
-                var results = await _qnaMaker.GetAnswersAsync(turnContext).ConfigureAwait(false);
+                // Here's where we actually call out to the QnA Maker service to get an answer.
+                var results = await _qnAMaker.GetAnswersAsync(turnContext).ConfigureAwait(false);
 
                 if (results.Any())
                 {
+                    // If there is a result, we get the answer with the highest score (best match)
                     var topResult = results.First();
                     await turnContext.SendActivityAsync(MessageFactory.Text(topResult.Answer), cancellationToken);
                 }
                 else
                 {
+                    // If there's no answer, say so.
                     await turnContext.SendActivityAsync(MessageFactory.Text("I'm sorry Dave, I don't understand you."), cancellationToken);
                 }
             }
             else
             {
-                await turnContext.SendActivityAsync($"{turnContext.Activity.Type} event detected");
+                await turnContext.SendActivityAsync($"{turnContext.Activity.Type} event detected", cancellationToken: cancellationToken);
             }
         }
     }

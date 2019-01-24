@@ -3,7 +3,7 @@
   "resources": [
     {
       "type": "endpoint",
-      "id": "1",
+      "id": "90",
       "name": "development",
       "url": "http://localhost:3978/api/messages"
     },
@@ -16,18 +16,7 @@
     {
       "type": "abs",
       "id": "3",
-      "name": "HalBot9000-abs"
-    },
-    {
-      "type": "appInsights",
-      "id": "4",
-      "name": "HalBot9000-insights"
-    },
-    {
-      "type": "blob",
-      "id": "5",
-      "name": "HalBot9000-blob",
-      "container": "botstatestore"
+      "name": "HalBot9000"
     }
   ]
 }
